@@ -8,24 +8,35 @@ I looked at four features that looked the most relevant for a comparison right n
 # Danceabiltiy
 US:
 M=0.751, SD=0.122, MD=0.768,  MIN=0.28, MAX=0.969
+
 NL:
+
 M=0.764, SD=0.123, MD=0.782,  MIN=0.35, MAX=0.972
 
 # Valence
 US:
+
 M=0.530, SD=0.219, MD=0.545,  MIN=0.04, MAX=0.967
+
 NL:
+
 M=0.597, SD=0.189, MD=0.61,  MIN=0.08, MAX=0.972
 
 # Energy
 US:
+
 M=0.636, SD=0.137, MD=0.637,  MIN=0.203, MAX=0.97
+
 NL:
+
 M=0.688, SD=0.123, MD=0.685,  MIN=0.288, MAX=0.961
 # Speechiness
 US:
+
 M=0.227, SD=0.130, MD=0.232,  MIN=0.02, MAX=0.856
+
 NL:
+
 M=0.200, SD=0.117, MD=0.184,  MIN=0.03, MAX=0.84
 
 The values for danceabiltiy are very similar for both playlists, but the mean and median values for valence and energy are both higher for Dutch Hip Hop which seems promising for further exploration. This while the mean and median values for speechiness are higher for American Hip Hop. This could also be related to the lower energy and valence values of American Hip Hop. 
