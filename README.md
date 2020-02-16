@@ -50,4 +50,6 @@ Furthermore some songs in the playlists didn't seem to have any values for the f
 
 # Week 2
 ![Plot 1](hiphopplot1.png)
+This plot shows the valence and energy of both the American and Dutch hip hop playlists plotted against eachother. Something that can be seen pretty immediately is that the points are way more concentrated in the upper right corner, which shows that Dutch hip hop in general is more happy and more energetic.
 ![Plot 2](hiphopplot2.png)
+This plot explores the energy of both playlists more, and strengthens the point that Dutch hip hop is more energetic than American hip hop.
