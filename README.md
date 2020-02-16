@@ -1,6 +1,8 @@
 # Computational Musicology
 # Ilja van Ipenburg (11862904)
 
+# Week 1
+
 The corpus I will be using are two playlists, one consisting of American Hip Hop and one consisting of Dutch Hip Hop. Right now both playlists consist of about 600-700 songs, which were collected through the most popular playlists for both search terms. The playlists represent the two genres pretty well, they contain both older and newer songs and consist mostly of the most popular songs in both genres.
 
 I looked at four features that looked the most relevant for a comparison right now. These four features are: 'danceabiltiy', 'valence', 'energy' and 'speechiness'. For these four features, the mean, median, maximum and minimum were computed. To keep it clear, I will show all the values right now:
@@ -45,3 +47,7 @@ The values for danceabiltiy are very similar for both playlists, but the mean an
 When looking at outliers a funny find was that the track with the highest energy from the American Hip Hop playlist is "Hey Ya" by OutKast, which is obviously one of the most popular hip hop songs that is known for it's high energy. When looking at the lowest energy hip hop song from the same playlist, it is still very obviously a hip hop track, but also from another side of the spectrum. The highest energy song from the Dutch playlist seems to be a remix of a non-Dutch song, judging from this, the playlists still need to be cleaned to remove these kind of songs. 
 
 Furthermore some songs in the playlists didn't seem to have any values for the features yet, these seem to be very new songs, so these must also be removed. 
+
+# Week 2
+![Plot 1](hiphopplot1.png)
+![Plot 2](hiphopplot2.png)
