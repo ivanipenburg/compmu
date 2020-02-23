@@ -1,6 +1,6 @@
 ---
 title:  'Computational Musicology'
-author: 'John Ashley Burgoyne'
+author: 'Ilja van Ipenburg'
 date:   'February--March 2020'
 output: 
     flexdashboard::flex_dashboard:
@@ -17,75 +17,100 @@ source('spotify.R')
 ```
 
 ### Introduction
+For the person giving feedback: I know that the differences between both playlists are not big enough to have an interesting enough research question. I put a lot of hours and effort this week into a new research question, which would compare the Top of the Year playlists of my brother and I, but it wasn't working out the way I hoped and the differences seemed to be minimal there too (which is weird to me, because we listen to very different genres of music). For now I have re-used my old research question and formatted it into the flexdashboard, but for next week I'll either try to work out the problems with the other research question of find another one yet again.
 
-This is introductory text. In general, it is not possible to use headers in this text.
+The corpus I will be using are two playlists, one consisting of American Hip Hop and one consisting of Dutch Hip Hop. Right now both playlists consist of about 600-700 songs, which were collected through the most popular playlists for both search terms. The playlists represent the two genres pretty well, they contain both older and newer songs and consist mostly of the most popular songs in both genres.
+
+I looked at four features that looked the most relevant for a comparison right now. These four features are: 'danceabiltiy', 'valence', 'energy' and 'speechiness'. For these four features, the mean, median, maximum and minimum were computed. To keep it clear, I will show all the values right now:
+Danceabiltiy
+
+US:
+
+M=0.751, SD=0.122, MD=0.768, MIN=0.28, MAX=0.969
+
+NL:
+
+M=0.764, SD=0.123, MD=0.782, MIN=0.35, MAX=0.972
+Valence
+
+US:
+
+M=0.530, SD=0.219, MD=0.545, MIN=0.04, MAX=0.967
+
+NL:
+
+M=0.597, SD=0.189, MD=0.61, MIN=0.08, MAX=0.972
+Energy
+
+US:
+
+M=0.636, SD=0.137, MD=0.637, MIN=0.203, MAX=0.97
+
+NL:
+
+M=0.688, SD=0.123, MD=0.685, MIN=0.288, MAX=0.961
+Speechiness
+
+US:
+
+M=0.227, SD=0.130, MD=0.232, MIN=0.02, MAX=0.856
+
+NL:
+
+M=0.200, SD=0.117, MD=0.184, MIN=0.03, MAX=0.84
+
+The values for danceabiltiy are very similar for both playlists, but the mean and median values for valence and energy are both higher for Dutch Hip Hop which seems promising for further exploration. This while the mean and median values for speechiness are higher for American Hip Hop. This could also be related to the lower energy and valence values of American Hip Hop.
+
+When looking at outliers a funny find was that the track with the highest energy from the American Hip Hop playlist is "Hey Ya" by OutKast, which is obviously one of the most popular hip hop songs that is known for it's high energy. When looking at the lowest energy hip hop song from the same playlist, it is still very obviously a hip hop track, but also from another side of the spectrum. The highest energy song from the Dutch playlist seems to be a remix of a non-Dutch song, judging from this, the playlists still need to be cleaned to remove these kind of songs.
+
+Furthermore some songs in the playlists didn't seem to have any values for the features yet, these seem to be very new songs, so these must also be removed.
 
 ***
 
 This is a second column of introductory text.
 
 
-### The Grammys are angrier than the Edisons
+### Dutch Hip Hop is happier and more energetic than American Hip Hop
 
 ```{r}
-grammy <- get_playlist_audio_features('digster.fm', '4kQovkgBZTd8h2HCM3fF31')
-edison <- get_playlist_audio_features('spotify', '37i9dQZF1DX8mnKbIkppDf')
-awards <-
-    grammy %>% mutate(playlist = "Grammys") %>%
-    bind_rows(edison %>% mutate(playlist = "Edisons"))
-angry <-
-    awards %>%                   # Start with awards.
-    mutate(                      # Make pretty labels for mode.
-        mode =                  
-            factor(
-                mode, 
-                c(1, 0), 
-                c("Major", "Minor")
-            )
-    ) %>% 
-    ggplot(                      # Set up the plot.
-        aes(
-            x = valence,
-            y = energy,
-            size = loudness,
-            colour = mode,
-            label = track.name   # Labels will be interactively visible.
-        )
-    ) +
-    geom_point() +               # Scatter plot.
-    geom_rug(size = 0.1) +       # Add 'fringes' to show data distribution.
-    facet_wrap(~ playlist) +     # Separate charts per playlist.
-    scale_x_continuous(          # Fine-tune the x axis.
-        limits = c(0, 1),
-        breaks = c(0, 0.50, 1),  # Use grid-lines for quadrants only.
-        minor_breaks = NULL      # Remove 'minor' grid-lines.
-    ) +
-    scale_y_continuous(          # Fine-tune the y axis in the same way.
-        limits = c(0, 1),
-        breaks = c(0, 0.50, 1),
-        minor_breaks = NULL
-    ) +
-    scale_colour_brewer(         # Use the Color Brewer to choose a palette.
-        type = "qual",           # Qualitative set.
-        palette = "Paired"       # Name of the palette is 'Paired'.
-    ) +
-    scale_size_continuous(       # Fine-tune the sizes of each point.
-        trans = "exp",           # Use an exp transformation to emphasise loud.
-        guide = "none"           # Remove the legend for size.
-    ) +
-    theme_light() +              # Use a simpler them.
+american_hiphop <- get_playlist_audio_features('spotify','6HhVYlD3Ms2i1kAo3onqf2')
+dutch_hiphop <- get_playlist_audio_features('spotify','5WQB86rfqiO7uE1U7el2U6')
+
+hiphop <- 
+  american_hiphop %>% mutate(playlist = "American Hip Hop") %>%
+  bind_rows(dutch_hiphop %>% mutate(playlist = "Dutch Hip Hop"))
+
+ggplot(hiphop, aes(x = valence, y = energy, color = playlist)) +
+    geom_point(alpha = 0.4, size=4) +
     labs(                        # Make the titles nice.
-        x = "Valence",
-        y = "Energy",
-        colour = "Mode"
-    )
-ggplotly(angry)
+      x = "Valence",
+      y = "Energy",
+      color = "Genre"
+    ) +
+    ggtitle("Energy and valence of American and Dutch hip hop")
 ```
 
 ***
 
-For this visualisation from Week 7, I took playlists of the pop music presented at the Grammy awards (US) and the Edison awards (NL) in 2019. Using `ggplotly`, the visualisation became interactive.
+This plot shows the valence and energy of both the American and Dutch hip hop playlists plotted against eachother. Something that can be seen pretty immediately is that the points are way more concentrated in the upper right corner, which shows that Dutch hip hop in general is more happy and more energetic. 
 
-The *x* axis shows valence and the *y* axis shows Spotify's ‘energy’ feature, which is roughly analogous to the notion of arousal in psychological research on emotion. Under this model, the quadrants of each graph, starting clockwise from the top left, represent angry, happy, relaxed, and sad music. The size of each point is proportional to the average volume of the track.
+### The energy of both genres compared
 
-The visualisation shows that in 2019, the pop music at the Grammys was (according to Spotify) rather angrier and rather louder than the music at the Edisons.
+```{r}
+ggplot(hiphop, aes(x = playlist, y = energy, fill = playlist)) +
+  geom_boxplot(alpha = 0.8) +
+  labs(
+    x = "Genre",
+    y = "Energy",
+    color = "Genre"
+  ) +
+  ggtitle("Energy of American and Dutch hip hop")
+```
+
+***
+
+This plot explores the energy of both playlists more, and strengthens the point that Dutch hip hop is more energetic than American hip hop.
+
+### Conclusion and Discussion
+
+Nothing here yet
