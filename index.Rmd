@@ -14,103 +14,86 @@ library(tidyverse)
 library(plotly)
 library(spotifyr)
 source('spotify.R')
+
+joran2016 <- get_playlist_audio_features("spotify", "37i9dQZF1CyJsMsSzzPflw")
+joran2017 <- get_playlist_audio_features("spotify", "37i9dQZF1E9TOYaUQk6QFJ")
+joran2018 <- get_playlist_audio_features("spotify", "37i9dQZF1EjkhTcRUoUqV5")
+joran2019 <- get_playlist_audio_features("spotify", "37i9dQZF1Et8uLwNBVrvuH")
+  
+ilja2016 <- get_playlist_audio_features("spotify", "37i9dQZF1Cz2hsgWnHLGyO")
+ilja2017 <- get_playlist_audio_features("spotify", "37i9dQZF1E9NzC698hTPFX")
+ilja2018 <- get_playlist_audio_features("spotify", "37i9dQZF1EjtD9Bk3XI1ge")
+ilja2019 <- get_playlist_audio_features("spotify", "37i9dQZF1Etj3WX3nXZqyP")
+
+joran <- 
+  joran2016 %>% mutate(year="2016") %>%
+  bind_rows(joran2017 %>% mutate(year="2017") %>%
+  bind_rows(joran2018 %>% mutate(year="2018") %>%
+  bind_rows(joran2019 %>% mutate(year="2019"))))
+
+ilja <- 
+  ilja2016 %>% mutate(year="2016") %>%
+  bind_rows(ilja2017 %>% mutate(year="2017") %>%
+  bind_rows(ilja2018 %>% mutate(year="2018") %>%
+  bind_rows(ilja2019 %>% mutate(year="2019"))))
+
+data <- 
+  joran %>% mutate(person="Joran") %>%
+  bind_rows(ilja %>% mutate(person="Ilja"))
+
+mean_joran <- joran %>%
+  group_by(year) %>%
+  summarise(mean_energy = mean(energy), SD_energy = sd(energy), mean_danceability = mean(danceability), SD_danceability = sd(danceability), mean_valence = mean(valence), SD_valence = sd(valence), mean_acousticness = mean(acousticness), mean_instrumentalness = mean(instrumentalness))
+mean_ilja <- ilja %>%
+  group_by(year) %>%
+  summarise(mean_energy = mean(energy), SD_energy = sd(energy), mean_danceability = mean(danceability), SD_danceability = sd(danceability), mean_valence = mean(valence), SD_valence = sd(valence), mean_acousticness = mean(acousticness), mean_instrumentalness = mean(instrumentalness))
+
+
+mean <-
+  mean_joran %>% mutate(owner="Joran") %>%
+  bind_rows(mean_ilja %>% mutate(owner="Ilja"))
 ```
 
-### Introduction
-For the person giving feedback: I know that the differences between both playlists are not big enough to have an interesting enough research question. I put a lot of hours and effort this week into a new research question, which would compare the Top of the Year playlists of my brother and I, but it wasn't working out the way I hoped and the differences seemed to be minimal there too (which is weird to me, because we listen to very different genres of music). For now I have re-used my old research question and formatted it into the flexdashboard, but for next week I'll either try to work out the problems with the other research question of find another one yet again.
 
-The corpus I will be using are two playlists, one consisting of American Hip Hop and one consisting of Dutch Hip Hop. Right now both playlists consist of about 600-700 songs, which were collected through the most popular playlists for both search terms. The playlists represent the two genres pretty well, they contain both older and newer songs and consist mostly of the most popular songs in both genres.
 
-I looked at four features that looked the most relevant for a comparison right now. These four features are: 'danceabiltiy', 'valence', 'energy' and 'speechiness'. For these four features, the mean, median, maximum and minimum were computed. To keep it clear, I will show all the values right now:
-Danceabiltiy
+### Introduction: Brothers leaving the nest, but staying close together
+```{r}
 
-US:
-
-M=0.751, SD=0.122, MD=0.768, MIN=0.28, MAX=0.969
-
-NL:
-
-M=0.764, SD=0.123, MD=0.782, MIN=0.35, MAX=0.972
-Valence
-
-US:
-
-M=0.530, SD=0.219, MD=0.545, MIN=0.04, MAX=0.967
-
-NL:
-
-M=0.597, SD=0.189, MD=0.61, MIN=0.08, MAX=0.972
-Energy
-
-US:
-
-M=0.636, SD=0.137, MD=0.637, MIN=0.203, MAX=0.97
-
-NL:
-
-M=0.688, SD=0.123, MD=0.685, MIN=0.288, MAX=0.961
-Speechiness
-
-US:
-
-M=0.227, SD=0.130, MD=0.232, MIN=0.02, MAX=0.856
-
-NL:
-
-M=0.200, SD=0.117, MD=0.184, MIN=0.03, MAX=0.84
-
-The values for danceabiltiy are very similar for both playlists, but the mean and median values for valence and energy are both higher for Dutch Hip Hop which seems promising for further exploration. This while the mean and median values for speechiness are higher for American Hip Hop. This could also be related to the lower energy and valence values of American Hip Hop.
-
-When looking at outliers a funny find was that the track with the highest energy from the American Hip Hop playlist is "Hey Ya" by OutKast, which is obviously one of the most popular hip hop songs that is known for it's high energy. When looking at the lowest energy hip hop song from the same playlist, it is still very obviously a hip hop track, but also from another side of the spectrum. The highest energy song from the Dutch playlist seems to be a remix of a non-Dutch song, judging from this, the playlists still need to be cleaned to remove these kind of songs.
-
-Furthermore some songs in the playlists didn't seem to have any values for the features yet, these seem to be very new songs, so these must also be removed.
+ggplot(mean, aes(x = year, linetype = owner, group = owner)) +
+  geom_line(aes(y = mean_energy, color="Danceability", alpha=0.9), size = 2) +
+  geom_line(aes(y = mean_danceability, color="Energy", alpha=0.9), size = 2) +
+  geom_line(aes(y = mean_valence, color="Valence", alpha=0.9), size = 2) +
+  geom_line(aes(y = mean_acousticness, color="Acousticness", alpha=0.9), size = 2) +
+  geom_line(aes(y = mean_instrumentalness, color="Instrumentalness", alpha=0.9), size = 2) +
+  labs(x="Year", y="Mean", colour="Colour", type="Person", title="Feature means over the years") +
+  guides(alpha="none")
+```
 
 ***
 
-This is a second column of introductory text.
+In this portfolio I will be comparing the music taste of my brother Joran and I (Ilja) over the years. To do this, I will be using Spotify's "Your Top Songs 20XX" playlist from both my brother and I for 2016 until 2019. Both of us have been using spotify as our main music app for these years, so your top songs playlists should reflect our music taste over the years pretty closely.
 
+The research question I will be trying to answer is how me and my brothers music taste have changed over the years and if our music tastes have grown closer to eachother or further apart over the past few years. This is an interesting question, as we lived together with my parents in 2016 and most of 2017, but in November 2017 I moved to Diemen and in January of 2018 my brother moved away to Rotterdam. I'm curious as to how this may have affected our music tastes, because when we both lived at my parents we were exposed to each others music regularly, but now it is not a regular occurance anymore.
 
-### Dutch Hip Hop is happier and more energetic than American Hip Hop
+As a first look at the change in your music over the years, I plotted the means of five Spotify features over these past four years. To give a better understanding of the plot, I will tell you about our general taste in music over the years. In 2016, I listened to what I would describe as mostly indierock, (indie)pop and electronic music, with a little bit of metal and hip-hop sprinkled in. For my brother, his taste was mostly metal, alternative rock and also electonic music. After this, my music taste shifted to a lot more hip-hop and less pop, while my brother started listening to more electronic music. In the last two years, I also started listening to more electronic music while also continuing my trend of hip-hop. My brother kept up with the electronic music, but also started listening to some less agressive rock. I think these changes are also reflected in the data. My danceability and energy seem to have generally gone upwards over the last few years, which is probably mostly due to more electronic music and milder hip-hop. For my brother, these have seemed to stay pretty much the same. With morer electronic music, you would expect the instrumentalness to go up like it did for my brother, but I think it didn't because I listen to slightly different electronic music than my brother. We both listen to a lot of drum&bass, but I listen to drum&bass with more vocals and melody while he listens to some rougher stuff.
+
+In general, I think the plotted lines show we grew apart a bit after we both left the house, but have come closer together in the last year.
+
+### The happiness of our music switched places.
 
 ```{r}
-american_hiphop <- get_playlist_audio_features('spotify','6HhVYlD3Ms2i1kAo3onqf2')
-dutch_hiphop <- get_playlist_audio_features('spotify','5WQB86rfqiO7uE1U7el2U6')
+ggplot(data, aes(x=danceability, y=valence, color=person, size=energy)) +
+  geom_point(alpha=0.5) +
+  facet_wrap(~ year) +
+  guides(fill = FALSE) +
+  labs(x="Danceability", y="Valence", colour="Person", size="Energy", title="Valence and danceability over the years")
 
-hiphop <- 
-  american_hiphop %>% mutate(playlist = "American Hip Hop") %>%
-  bind_rows(dutch_hiphop %>% mutate(playlist = "Dutch Hip Hop"))
-
-ggplot(hiphop, aes(x = valence, y = energy, color = playlist)) +
-    geom_point(alpha = 0.4, size=4) +
-    labs(                        # Make the titles nice.
-      x = "Valence",
-      y = "Energy",
-      color = "Genre"
-    ) +
-    ggtitle("Energy and valence of American and Dutch hip hop")
 ```
 
 ***
 
-This plot shows the valence and energy of both the American and Dutch hip hop playlists plotted against eachother. Something that can be seen pretty immediately is that the points are way more concentrated in the upper right corner, which shows that Dutch hip hop in general is more happy and more energetic. 
+This plot is showing the data of all the songs over the years. Something that is immediately clear is that the valence for me (which is the red cloud) has seem to floated to the top of the blue sea a little bit. This could also be seen in the line chart in the last storyboard, but I think this plot shows it more clearly. While my brothers music had a higher valence in the first two years, mine suddenly started rising in 2018, while the valence of my brother lowered a little bit. You could think that I have gotten happier over the years, which I don't think is the case, but maybe sometimes you need happier music to cheer you up.
 
-### The energy of both genres compared
+### Week 9: Chromagrams/cepstrograms and stuff
 
-```{r}
-ggplot(hiphop, aes(x = playlist, y = energy, fill = playlist)) +
-  geom_boxplot(alpha = 0.8) +
-  labs(
-    x = "Genre",
-    y = "Energy",
-    color = "Genre"
-  ) +
-  ggtitle("Energy of American and Dutch hip hop")
-```
-
-***
-
-This plot explores the energy of both playlists more, and strengthens the point that Dutch hip hop is more energetic than American hip hop.
-
-### Conclusion and Discussion
-
-Nothing here yet
+Sadly I had a busy week and couldn't get the compmus library to work when I got to that part on sunday. I would however appreciate it if you could give some feedback on the rest, as I've changed my research question this week as my last one wasn't that interesting.
