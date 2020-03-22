@@ -13,7 +13,13 @@ output:
 library(tidyverse)
 library(plotly)
 library(spotifyr)
+library(compmus)
+library(tidymodels)
+library(protoclust)
+library(ggdendro)
+library(heatmaply)
 source('spotify.R')
+
 
 joran2016 <- get_playlist_audio_features("spotify", "37i9dQZF1CyJsMsSzzPflw")
 joran2017 <- get_playlist_audio_features("spotify", "37i9dQZF1E9TOYaUQk6QFJ")
@@ -24,6 +30,9 @@ ilja2016 <- get_playlist_audio_features("spotify", "37i9dQZF1Cz2hsgWnHLGyO")
 ilja2017 <- get_playlist_audio_features("spotify", "37i9dQZF1E9NzC698hTPFX")
 ilja2018 <- get_playlist_audio_features("spotify", "37i9dQZF1EjtD9Bk3XI1ge")
 ilja2019 <- get_playlist_audio_features("spotify", "37i9dQZF1Etj3WX3nXZqyP")
+
+
+top2000 <- get_playlist_audio_features("spotify","1DTzz7Nh2rJBnyFbjsH1Mh")
 
 joran <- 
   joran2016 %>% mutate(year="2016") %>%
@@ -54,7 +63,120 @@ mean <-
   bind_rows(mean_ilja %>% mutate(owner="Ilja"))
 ```
 
+###Can an algorithm keep my brother and I apart? An exploration of classification algorithms.
+```{r}
+joran_all <- 
+    get_playlist_audio_features('spotify','6AQ2vTw5w1MUrRJU1UPgSq') %>% 
+    slice(1:300) %>% 
+    add_audio_analysis
+ilja_all <- 
+    get_playlist_audio_features('spotify','0cZ5aTDYVYK2Fwq0RehG48') %>% 
+    slice(1:300) %>% 
+    add_audio_analysis
 
+bros <- 
+    joran_all %>% mutate(playlist = "Joran") %>% 
+    bind_rows(
+        ilja_all %>% mutate(playlist = "Ilja")) %>% 
+    mutate(playlist = factor(playlist)) %>% 
+    mutate(
+        segments = 
+            map2(segments, key, compmus_c_transpose)) %>% 
+    mutate(
+        pitches = 
+            map(segments, 
+                compmus_summarise, pitches, 
+                method = 'mean', norm = 'manhattan'),
+        timbre =
+            map(
+                segments,
+                compmus_summarise, timbre,
+                method = 'mean')) %>% 
+    mutate(pitches = map(pitches, compmus_normalise, 'clr')) %>% 
+    mutate_at(vars(pitches, timbre), map, bind_rows) %>% 
+    unnest(cols = c(pitches, timbre))
+
+bros_class <- 
+    recipe(playlist ~
+               danceability +
+               energy +
+               loudness +
+               speechiness +
+               acousticness +
+               instrumentalness +
+               liveness +
+               valence +
+               tempo +
+               duration +
+               C + `C#|Db` + D + `D#|Eb` +
+               E + `F` + `F#|Gb` + G +
+               `G#|Ab` + A + `A#|Bb` + B +
+               c01 + c02 + c03 + c04 + c05 + c06 +
+               c07 + c08 + c09 + c10 + c11 + c12,
+           data = bros) %>% 
+    step_center(all_predictors()) %>%
+    step_scale(all_predictors()) %>%
+    # step_range(all_predictors()) %>% 
+    prep(bros) %>% 
+    juice
+
+bros_cv <- bros_class %>% vfold_cv(10)
+
+bros_knn <- 
+    nearest_neighbor(mode = 'classification', neighbors = 1) %>% 
+    set_engine('kknn')
+predict2_knn <- function(split)
+    fit(bros_knn, playlist ~ ., data = analysis(split)) %>% 
+    predict(assessment(split), type = 'class') %>%
+    bind_cols(assessment(split))
+
+bros_cv %>% 
+    mutate(pred = map(splits, predict2_knn)) %>% unnest(pred) %>% 
+    conf_mat(truth = playlist, estimate = .pred_class) %>% 
+    autoplot(type = 'heatmap')
+
+bros_tree <- 
+    decision_tree(mode = 'classification') %>%
+    set_engine('C5.0')
+predict2_tree <- function(split)
+    fit(bros_tree, playlist ~ ., data = analysis(split)) %>% 
+    predict(assessment(split), type = 'class') %>%
+    bind_cols(assessment(split))
+
+
+
+bros_cv %>% 
+    mutate(pred = map(splits, predict2_tree)) %>% unnest(pred) %>% 
+    conf_mat(truth = playlist, estimate = .pred_class) %>% 
+    autoplot(type = 'heatmap')
+
+bros_forest <- 
+    rand_forest(mode = 'classification') %>% 
+    set_engine('randomForest')
+predict2_forest <- function(split)
+    fit(bros_forest, playlist ~ ., data = analysis(split)) %>% 
+    predict(assessment(split), type = 'class') %>%
+    bind_cols(assessment(split))
+
+
+bros_cv %>% 
+    mutate(pred = map(splits, predict2_forest)) %>% unnest(pred) %>% 
+    conf_mat(truth = playlist, estimate = .pred_class) %>% 
+    autoplot(type = 'heatmap')
+```
+
+***
+
+
+An interesting question is if the music taste of me and my brother is different enough for a classifier to see the difference. To see this, I used the provided k-nearest neighbors classifier and trained it on a dataset of 300 of my top songs and 300 of my brothers top songs. 
+
+The algorithm gave some clear results and in the first graph a clear diagonal line can be seen. For a confusion matrix a solid diagonal line means that the classifier has classified everything correctly, so when you see a diagonal it means it has done a pretty good job.
+
+Looking at the numbers, the classifier had an accuracy of 62.8%, which means it classified a song correctly 62.8% of the time. The baseline for this prediction is 50%, as that is the accuracy you will get if you pick a person at random. So the classifier is better than picking at random, but definitely not perfect. I tried removing features that seemed less important according to the difference in means, but this didn't seem to increase the accuracy in a significant way.
+
+Using the decision trees method the accuracy increased to 67.0%. The confusion matrix is shown in the second graph. What is interesting to note is that number of correct predictions for my songs increased, but for my brother it slightly decreased. The most important features for the decision tree seems to be energy, acousticness, speechiness and loudness.
+
+Lastly, using the random forests classification method, the accuracy increased to 73.8%. This method definitely seems to be the best for this specific dataset and also provides the best looking confusion matrix as seen in the third graph, with an increase for both playlists.
 
 ### Introduction: Brothers leaving the nest, but staying close together
 ```{r}
@@ -66,7 +188,8 @@ ggplot(mean, aes(x = year, linetype = owner, group = owner)) +
   geom_line(aes(y = mean_acousticness, color="Acousticness", alpha=0.9), size = 2) +
   geom_line(aes(y = mean_instrumentalness, color="Instrumentalness", alpha=0.9), size = 2) +
   labs(x="Year", y="Mean", colour="Colour", type="Person", title="Feature means over the years") +
-  guides(alpha="none")
+  guides(alpha="none") +
+  theme_minimal()
 ```
 
 ***
@@ -86,7 +209,8 @@ ggplot(data, aes(x=danceability, y=valence, color=person, size=energy)) +
   geom_point(alpha=0.5) +
   facet_wrap(~ year) +
   guides(fill = FALSE) +
-  labs(x="Danceability", y="Valence", colour="Person", size="Energy", title="Valence and danceability over the years")
+  labs(x="Danceability", y="Valence", colour="Person", size="Energy", title="Valence and danceability over the years") +
+  theme_minimal()
 
 ```
 
@@ -94,6 +218,332 @@ ggplot(data, aes(x=danceability, y=valence, color=person, size=energy)) +
 
 This plot is showing the data of all the songs over the years. Something that is immediately clear is that the valence for me (which is the red cloud) has seem to floated to the top of the blue sea a little bit. This could also be seen in the line chart in the last storyboard, but I think this plot shows it more clearly. While my brothers music had a higher valence in the first two years, mine suddenly started rising in 2018, while the valence of my brother lowered a little bit. You could think that I have gotten happier over the years, which I don't think is the case, but maybe sometimes you need happier music to cheer you up.
 
-### Week 9: Chromagrams/cepstrograms and stuff
+### Looking at the timbre and chroma of our top songs
 
-Sadly I had a busy week and couldn't get the compmus library to work when I got to that part on sunday. I would however appreciate it if you could give some feedback on the rest, as I've changed my research question this week as my last one wasn't that interesting.
+```{r}
+devil <- 
+  get_tidy_audio_analysis('1UGD3lW3tDmgZfAVDh6w7r') %>% 
+  compmus_align(bars, segments) %>% 
+  select(bars) %>% unnest(bars) %>% 
+  mutate(
+    pitches = 
+      map(segments, 
+          compmus_summarise, pitches, 
+          method = 'rms', norm = 'euclidean')) %>% 
+  mutate(
+    timbre = 
+      map(segments, 
+          compmus_summarise, timbre, 
+          method = 'rms', norm = 'euclidean'))
+
+css_devil_timbre <- compmus_self_similarity(devil, timbre, 'cosine')
+  
+devil_timbre_plot <- ggplot(css_devil_timbre,
+    aes(
+      x = xstart + xduration / 2, 
+      width = xduration,
+      y = ystart + yduration / 2,
+      height = yduration,
+      fill = d)) + 
+  geom_tile() +
+  coord_fixed() +
+  scale_fill_viridis_c(option = 'B', guide = 'none') +
+  theme_classic() +
+  labs(x = '', y = '', title="Timbre")
+
+css_devil_chroma <- compmus_self_similarity(devil, pitches, 'cosine')
+  
+devil_chroma_plot <- ggplot(css_devil_chroma,
+    aes(
+      x = xstart + xduration / 2, 
+      width = xduration,
+      y = ystart + yduration / 2,
+      height = yduration,
+      fill = d)) + 
+  geom_tile() +
+  coord_fixed() +
+  scale_fill_viridis_c(option = 'B', guide = 'none') +
+  theme_classic() +
+  labs(x = '', y = '', title="Chroma")
+
+require(grid)
+require(gridExtra)
+grid.arrange(devil_timbre_plot, devil_chroma_plot, ncol=2, top=textGrob("Devil In A New Dress",gp=gpar(fontsize=20,font=1)))
+
+
+space <- 
+  get_tidy_audio_analysis('72Z17vmmeQKAg8bptWvpVG') %>% 
+  compmus_align(bars, segments) %>% 
+  select(bars) %>% unnest(bars) %>% 
+  mutate(
+    pitches = 
+      map(segments, 
+          compmus_summarise, pitches, 
+          method = 'rms', norm = 'euclidean')) %>% 
+  mutate(
+    timbre = 
+      map(segments, 
+          compmus_summarise, timbre, 
+          method = 'rms', norm = 'euclidean'))
+
+css_space_timbre <- compmus_self_similarity(space, timbre, 'cosine')
+  
+space_timbre_plot <- ggplot(css_space_timbre,
+    aes(
+      x = xstart + xduration / 2, 
+      width = xduration,
+      y = ystart + yduration / 2,
+      height = yduration,
+      fill = d)) + 
+  geom_tile() +
+  coord_fixed() +
+  scale_fill_viridis_c(option = 'B', guide = 'none') +
+  theme_classic() +
+  labs(x = '', y = '', title="Timbre")
+
+css_space_chroma <- compmus_self_similarity(space, pitches, 'cosine')
+  
+space_chroma_plot <- ggplot(css_space_chroma,
+    aes(
+      x = xstart + xduration / 2, 
+      width = xduration,
+      y = ystart + yduration / 2,
+      height = yduration,
+      fill = d)) + 
+  geom_tile() +
+  coord_fixed() +
+  scale_fill_viridis_c(option = 'B', guide = 'none') +
+  theme_classic() +
+  labs(x = '', y = '', title="Chroma")
+
+require(grid)
+require(gridExtra)
+grid.arrange(space_timbre_plot, space_chroma_plot, ncol=2, top=textGrob("Space Oddity",gp=gpar(fontsize=20,font=1)))
+```
+
+***
+
+For these plots we looked at the chroma and timbre of one song for both of us. These songs were selected from our top 10 songs of 2019 and chosen so that they could show us some interesting differences between different parts of the songs.
+
+The song that I chose from my playlist is Devil In A New Dress by Kanye West and Rick Ross. For the first part of the song it has a repeating beat with Kanye West rapping over it, but about 3 minutes into the song a bridge starts with a guitar solo (which is quite unheard of in hip hop music). This can be seen in both the timbre and chromagram around the 200 mark on the x-axis. After this solo Rick Ross starts his verse, which has a similar timbre and chroma to Kanye's part. Lastly, the song ends with another guitar parts, which can be clearly seen in the timbre graph, but less clearly in the chroma graph. This is because in the first solo, it is only the guitar, but at the end, the beat is also still playing through the guitar, so the chromagram doesn't pick it up.
+
+For my brother I chose the song Space Oddity by David Bowie (which to be honest, I wasn't quite familiar with). The song starts with an instrumental, then has its first verse after which is another instrumental. Then there is a second verse, a chorus, a third verse, again the chorus and lastly another intrumental part. Looking closely at the timbre graph, these different parts of the song can be picked out. There are four instumental parts, which can be seen from the four darker 'rectangles' along the diagonal. Between those rectangles are the verses and choruses, of which the choruses have the brightest colours.
+
+### The key to a good relationship with your brother: comparing the keys of our music.
+
+```{r}
+keys = c("C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B")
+
+keys_ilja <- data %>%
+  filter(person=="Ilja") %>%
+    ggplot(aes(x=factor(key, labels=keys))) +
+      geom_bar(fill="red", alpha=0.6) +
+      labs(x="Key", y="Count", title="Ilja") +
+      ylim(0, 75) +
+      theme_minimal()
+
+keys_joran <- data %>%
+  filter(person=="Joran") %>%
+    ggplot(aes(x=factor(key, labels=keys))) +
+      geom_bar(fill="blue", alpha=0.6) +
+      labs(x="Key", y="", title="Joran") +
+      ylim(0, 75) +
+      theme_minimal()
+
+keys_top2000 <- top2000[0:400,] %>%
+  ggplot(aes(x=factor(key, labels=keys))) +
+    geom_bar(fill="black", alpha=0.6) +
+    labs(x="Key", y="", title="Top 2000 (Selection)") +
+    ylim(0, 75) +
+    theme_minimal()
+
+require(grid)
+require(gridExtra)
+grid.arrange(keys_ilja, keys_joran, keys_top2000, ncol=3, top=textGrob("Keys per person",gp=gpar(fontsize=20,font=1)))
+
+
+
+```
+
+***
+
+For these graphs I compared the keys of my top songs, my brother's top songs and for a fair comparison also the first 400 songs of the Dutch Top 2000 playlists. I chose this playlist as it seems like a good general playlist that represents the music taste in The Netherlands. 
+
+Surprisingly, the graphs for my brother and I are quite similar, and nothing really stands out except maybe the lack of gaps between G, A and B for my playlist compared to my brothers playlist. To check that this is not just a standard distribution you can look at the top 2000 playlist and see that this has a way different distribution. 
+
+### 
+```{r}
+circshift <- function(v, n) {if (n == 0) v else c(tail(v, n), head(v, -n))}
+                                    
+    # C     C#    D     Eb    E     F     F#    G     Ab    A     Bb    B 
+major_chord <- 
+    c(1,    0,    0,    0,    1,    0,    0,    1,    0,    0,    0,    0)
+minor_chord <- 
+    c(1,    0,    0,    1,    0,    0,    0,    1,    0,    0,    0,    0)
+seventh_chord <- 
+    c(1,    0,    0,    0,    1,    0,    0,    1,    0,    0,    1,    0)
+major_key <- 
+    c(6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88)
+minor_key <-
+    c(6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17)
+chord_templates <-
+    tribble(
+        ~name  , ~template,
+        'Gb:7'  , circshift(seventh_chord,  6),
+        'Gb:maj', circshift(major_chord,    6),
+        'Bb:min', circshift(minor_chord,   10),
+        'Db:maj', circshift(major_chord,    1),
+        'F:min' , circshift(minor_chord,    5),
+        'Ab:7'  , circshift(seventh_chord,  8),
+        'Ab:maj', circshift(major_chord,    8),
+        'C:min' , circshift(minor_chord,    0),
+        'Eb:7'  , circshift(seventh_chord,  3),
+        'Eb:maj', circshift(major_chord,    3),
+        'G:min' , circshift(minor_chord,    7),
+        'Bb:7'  , circshift(seventh_chord, 10),
+        'Bb:maj', circshift(major_chord,   10),
+        'D:min' , circshift(minor_chord,    2),
+        'F:7'   , circshift(seventh_chord,  5),
+        'F:maj' , circshift(major_chord,    5),
+        'A:min' , circshift(minor_chord,    9),
+        'C:7'   , circshift(seventh_chord,  0),
+        'C:maj' , circshift(major_chord,    0),
+        'E:min' , circshift(minor_chord,    4),
+        'G:7'   , circshift(seventh_chord,  7),
+        'G:maj' , circshift(major_chord,    7),
+        'B:min' , circshift(minor_chord,   11),
+        'D:7'   , circshift(seventh_chord,  2),
+        'D:maj' , circshift(major_chord,    2),
+        'F#:min', circshift(minor_chord,    6),
+        'A:7'   , circshift(seventh_chord,  9),
+        'A:maj' , circshift(major_chord,    9),
+        'C#:min', circshift(minor_chord,    1),
+        'E:7'   , circshift(seventh_chord,  4),
+        'E:maj' , circshift(major_chord,    4),
+        'G#:min', circshift(minor_chord,    8),
+        'B:7'   , circshift(seventh_chord, 11),
+        'B:maj' , circshift(major_chord,   11),
+        'D#:min', circshift(minor_chord,    3))
+key_templates <-
+    tribble(
+        ~name    , ~template,
+        'Gb:maj', circshift(major_key,  6),
+        'Bb:min', circshift(minor_key, 10),
+        'Db:maj', circshift(major_key,  1),
+        'F:min' , circshift(minor_key,  5),
+        'Ab:maj', circshift(major_key,  8),
+        'C:min' , circshift(minor_key,  0),
+        'Eb:maj', circshift(major_key,  3),
+        'G:min' , circshift(minor_key,  7),
+        'Bb:maj', circshift(major_key, 10),
+        'D:min' , circshift(minor_key,  2),
+        'F:maj' , circshift(major_key,  5),
+        'A:min' , circshift(minor_key,  9),
+        'C:maj' , circshift(major_key,  0),
+        'E:min' , circshift(minor_key,  4),
+        'G:maj' , circshift(major_key,  7),
+        'B:min' , circshift(minor_key, 11),
+        'D:maj' , circshift(major_key,  2),
+        'F#:min', circshift(minor_key,  6),
+        'A:maj' , circshift(major_key,  9),
+        'C#:min', circshift(minor_key,  1),
+        'E:maj' , circshift(major_key,  4),
+        'G#:min', circshift(minor_key,  8),
+        'B:maj' , circshift(major_key, 11),
+        'D#:min', circshift(minor_key,  3))
+
+devil <- 
+    get_tidy_audio_analysis('1UGD3lW3tDmgZfAVDh6w7r') %>% 
+    compmus_align(sections, segments) %>% 
+    select(sections) %>% unnest(sections) %>% 
+    mutate(
+        pitches = 
+            map(segments, 
+                compmus_summarise, pitches, 
+                method = 'mean', norm = 'manhattan'))
+
+devil_key_thing <- devil %>% 
+    compmus_match_pitch_template(key_templates, 'euclidean', 'manhattan') %>% 
+    ggplot(
+        aes(x = start + duration / 2, width = duration, y = name, fill = d)) +
+    geom_tile() +
+    scale_fill_viridis_c(option = 'A', guide = 'none') +
+    theme_minimal() +
+    labs(x = 'Time (s)', y = '', title="Devil In A New Dress")
+
+
+space <- 
+    get_tidy_audio_analysis('72Z17vmmeQKAg8bptWvpVG') %>% 
+    compmus_align(sections, segments) %>% 
+    select(sections) %>% unnest(sections) %>% 
+    mutate(
+        pitches = 
+            map(segments, 
+                compmus_summarise, pitches, 
+                method = 'mean', norm = 'manhattan'))
+
+space_key_thing <- space %>% 
+    compmus_match_pitch_template(key_templates, 'euclidean', 'manhattan') %>% 
+    ggplot(
+        aes(x = start + duration / 2, width = duration, y = name, fill = d)) +
+    geom_tile() +
+    scale_fill_viridis_c(option = 'A', guide = 'none') +
+    theme_minimal() +
+    labs(x = 'Time (s)', y = '', title="Space Oddity")
+
+require(grid)
+require(gridExtra)
+grid.arrange(devil_key_thing, space_key_thing, ncol=2, top=textGrob("Keygrams",gp=gpar(fontsize=20,font=1)))
+```
+
+***
+
+In these graphs I look at the keygrams of the same two songs I looked at the chromagrams of, Devil In A New Dress and Space Oddity. 
+
+Devil In A New Dress definitely seems to be in F minor. This is most clearly seen during the verses, and is less clear during the bridge in the middle of the song.
+
+Space Oddity has a less clear key and maybe even seems to switch up for a little bit. The song seems to be in Db major, but during the verses it seems to switch to D minor according to the keygram. I don't think the keys are actually switched during the song, but I can't give a definitive answer as to what key the song is in by only looking at this graph.
+
+### Gotta go fast, or not: comparing the tempo of our top songs
+```{r}
+tempo_ilja <- data %>%
+  filter(person=="Ilja") %>%
+    ggplot(aes(x=tempo)) +
+      geom_histogram(fill="red", alpha=0.6) +
+      labs(x="Tempo", y="Count", title="Ilja") +
+      xlim(40, 200) +
+      ylim(0, 50) +
+      theme_minimal()
+
+tempo_joran <- data %>%
+  filter(person=="Joran") %>%
+    ggplot(aes(x=tempo)) +
+      geom_histogram(fill="blue", alpha=0.6) +
+      labs(x="Tempo", y="", title="Joran") +
+      xlim(40, 200) +
+      ylim(0, 50) +
+      theme_minimal()
+
+tempo_top2000 <- top2000[0:400,] %>%
+  ggplot(aes(x=tempo)) +
+    geom_histogram(fill="black", alpha=0.6) +
+    labs(x="Tempo", y="", title="Top 2000 (Selection)") +
+    xlim(40, 200) +
+    ylim(0, 50) +
+    theme_minimal()
+
+require(grid)
+require(gridExtra)
+grid.arrange(tempo_ilja, tempo_joran, tempo_top2000, ncol=3, top=textGrob("Tempo per person",gp=gpar(fontsize=20,font=1)))
+
+
+```
+
+***
+
+When comparing the tempos of our top songs, there is a visible difference. The first thing that you will notice while looking at the graphs is that my brother seems to listen to a lot of songs around the 175 BPM mark. This is very different from the distribution of the top 2000 songs, which can maybe be seen as a sort of average for the Dutch taste. However this peak can easily be explained by my brothers taste for Drum&Bass and other high tempo electronic music, as I also explained earlier. 
+
+The distribution of tempo in my top songs is actually quite similar to the top 2000 distribution and while I do also listen to some electronic music, it is a smaller part of my top songs. I would also say that the electronic music I listen to has a lower tempo than my brothers electronic music on average.
+
+
+
