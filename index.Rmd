@@ -63,7 +63,7 @@ mean <-
   bind_rows(mean_ilja %>% mutate(owner="Ilja"))
 ```
 
-###Can an algorithm keep my brother and I apart? An exploration of classification algorithms.
+### Can an algorithm keep my brother and I apart? An exploration of classification algorithms.
 ```{r}
 joran_all <- 
     get_playlist_audio_features('spotify','6AQ2vTw5w1MUrRJU1UPgSq') %>% 
@@ -166,7 +166,6 @@ bros_cv %>%
 ```
 
 ***
-
 
 An interesting question is if the music taste of me and my brother is different enough for a classifier to see the difference. To see this, I used the provided k-nearest neighbors classifier and trained it on a dataset of 300 of my top songs and 300 of my brothers top songs. 
 
