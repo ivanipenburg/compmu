@@ -1,6 +1,8 @@
 # Computational Musicology
 # Ilja van Ipenburg (11862904)
 
+See final product here: https://ivanipenburg.github.io/compmu/
+
 # Week 1
 
 The corpus I will be using are two playlists, one consisting of American Hip Hop and one consisting of Dutch Hip Hop. Right now both playlists consist of about 600-700 songs, which were collected through the most popular playlists for both search terms. The playlists represent the two genres pretty well, they contain both older and newer songs and consist mostly of the most popular songs in both genres.
